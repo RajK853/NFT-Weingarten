@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Football Training & Nutrition Plan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Neutral Greys (Zinc), Muted Blues, and Greens for emphasis (Bright & Dark Mode) -->
+    <!-- Application Structure Plan: A tab-based single-page application (SPA) with four main sections: Home, Nutrition, Training, and Gameplay Tips. This structure was chosen to break down the dense report into manageable, task-oriented views. The 'Home' section provides an overview. 'Nutrition' focuses on dietary guidelines with interactive charts and tables. 'Training' is highly interactive, allowing users to filter drills by category. 'Gameplay Tips' provides role-specific strategic advice, enhancing on-field understanding. This non-linear, filterable approach is more user-friendly and engaging for student-athletes than a linear document, facilitating quick access to relevant information like the weekly schedule or specific skill drills. -->
+    <!-- Visualization & Content Choices:
+        - Report Info: Macronutrient ratio -> Goal: Inform -> Viz: Doughnut Chart (Chart.js) -> Interaction: Hover for details -> Justification: Provides a quick, visual summary of the core nutritional target.
+        - Report Info: Recommended/Avoided Foods -> Goal: Organize/Compare -> Method: Two-column card layout -> Interaction: N/A -> Justification: Clear visual separation improves readability over a single large table.
+        - Report Info: Game Day Fueling -> Goal: Show Process -> Method: Vertical timeline (HTML/CSS) -> Interaction: N/A -> Justification: Intuitively represents the chronological steps for game-day prep.
+        - Report Info: Training Drills -> Goal: Organize/Filter -> Method: Filterable grid of cards -> Interaction: Click buttons to filter drill cards by category -> Justification: Allows users to self-direct their learning and focus on specific skills, a major usability improvement.
+        - Report Info: Weekly Schedule -> Goal: Organize -> Method: HTML Grid -> Interaction: N/A -> Justification: A standard grid is the clearest way to present a weekly calendar.
+        - Report Info: Gameplay Tips (new) -> Goal: Inform/Strategize -> Method: Role-specific sections with detailed text and embedded videos -> Interaction: Direct video links -> Justification: Provides in-depth, actionable advice for each position, directly enhancing in-game decision-making.
+        - New Feature: Dark/Bright Mode Toggle -> Goal: User Preference/Accessibility -> Method: Tailwind CSS dark variants & JS toggle -> Interaction: Click switch -> Justification: Improves user experience and accessibility.
+        - New Feature: Player Slideshow -> Goal: Engagement/Inspiration -> Method: Background images with JS fade transition -> Interaction: Automatic cycle -> Justification: Adds a "wow" factor and thematic visual appeal without obstructing content.
+        - New Feature: Generate Meal Idea (LLM) -> Goal: Personalized Nutrition Guidance -> Method: Custom modal input, LLM API call, Text output (concise list with emojis) -> Interaction: User prompt and LLM generation -> Justification: Provides dynamic meal suggestions based on nutritional guidelines, making the plan more interactive and practical, with improved visual clarity.
+        - New Feature: Suggest Custom Drill (LLM) -> Goal: Personalized Training Guidance -> Method: Custom modal input, LLM API call, Text output (concise bulleted list with emojis) -> Interaction: User prompt and LLM generation -> Justification: Offers tailored drill ideas, adapting the training section to specific user needs and skill focuses, with improved visual clarity.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .nav-active {
+            background-color: #3B82F6; /* blue-500 */
+            color: #ffffff;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            border-bottom-color: #ffffff; /* Match content background in bright mode */
+            z-index: 10; /* Bring active tab to front */
+        }
+        .nav-inactive {
+            background-color: #E2E8F0; /* slate-200 */
+            color: #475569; /* slate-700 */
+        }
+        .nav-inactive:hover {
+            background-color: #CBD5E1; /* slate-300 */
+        }
+        .nav-tab {
+            border: 1px solid #CBD5E1; /* slate-300 */
+            border-radius: 0.375rem 0.375rem 0 0; /* rounded-t-md */
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 500; /* font-medium */
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+            position: relative; /* For z-index to work */
+            z-index: 1; /* Ensure tabs are above content border */
+            flex-shrink: 0; /* Prevent shrinking if inside a flex container */
+            flex-grow: 0; /* Prevent growing */
+            border-bottom-width: 1px; /* Explicitly keep bottom border width consistent */
+        }
+        .content-section {
+            display: none;
+            /* No padding-top here, it's handled by the main container's py-8 */
+        }
+        .content-section.active {
+            display: block;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 320px;
+            height: 320px;
+            margin: auto;
+        }
+        .drill-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .drill-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .filter-btn-active {
+            background-color: #3B82F6; /* blue-500 */
+            color: white;
+        }
+        .filter-btn-inactive {
+            background-color: #E5E7EB; /* gray-200 */
+            color: #374151; /* gray-700 */
+        }
+        .filter-btn-inactive:hover {
+            background-color: #D1D5DB; /* gray-300 */
+        }
+        .slideshow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+        .slideshow-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+        }
+        .slideshow-image.active {
+            opacity: 0.2; /* Subtle background */
+        }
+        .slideshow-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(249, 250, 251, 0.8) 0%, rgba(249, 250, 251, 0.6) 100%);
+            z-index: 0;
+        }
+        /* Dark mode styles */
+        html.dark .slideshow-overlay {
+             background: linear-gradient(to bottom, rgba(39, 39, 42, 0.8) 0%, rgba(39, 39, 42, 0.6) 100%); /* zinc-900 */
+        }
+        html.dark {
+            background-color: #27272A; /* zinc-900 */
+            color: #FAFAFA; /* zinc-50 */
+        }
+        html.dark .bg-white {
+            background-color: #3F3F46; /* zinc-700 */
+            color: #FAFAFA;
+        }
+        html.dark .text-gray-900 {
+            color: #FAFAFA;
+        }
+        html.dark .text-gray-600 {
+            color: #D4D4D8; /* zinc-300 */
+        }
+        html.dark .text-gray-700 {
+            color: #E4E4E7; /* zinc-200 */
+        }
+        html.dark .nav-inactive {
+            background-color: #52525B; /* zinc-600 */
+            color: #FAFAFA;
+            border-color: #52525B;
+        }
+        html.dark .nav-inactive:hover {
+            background-color: #71717A; /* zinc-500 */
+        }
+        html.dark .nav-active {
+            background-color: #60A5FA; /* blue-400 */
+            border-color: #52525B; /* zinc-600 */
+            border-bottom-color: #3F3F46; /* Match content background in dark mode (zinc-700) */
+        }
+        html.dark .nav-tab {
+            border-color: #52525B; /* zinc-600 */
+        }
+        html.dark .bg-emerald-50 {
+            background-color: #065F46; /* emerald-800 */
+            color: #ECFDF5; /* emerald-50 */
+        }
+        html.dark .border-emerald-200 {
+            border-color: #34D399; /* emerald-400 */
+        }
+        html.dark .text-emerald-700 {
+            color: #A7F3D0; /* emerald-200 */
+        }
+        html.dark .text-red-50 {
+            background-color: #991B1B; /* red-900 */
+            color: #FEE2E2; /* red-100 */
+        }
+        html.dark .border-red-200 {
+            border-color: #F87171; /* red-400 */
+        }
+        html.dark .text-red-700 {
+            color: #FCA5A5; /* red-300 */
+        }
+        html.dark .bg-blue-50 {
+            background-color: #1E40AF; /* blue-900 */
+            color: #DBEAFE; /* blue-100 */
+        }
+        html.dark .border-blue-200 {
+            border-color: #60A5FA; /* blue-400 */
+        }
+        html.dark .text-blue-700 {
+            color: #93C5FD; /* blue-300 */
+        }
+        html.dark .filter-btn-inactive {
+            background-color: #52525B; /* zinc-600 */
+            color: #FAFAFA;
+        }
+        html.dark .filter-btn-inactive:hover {
+            background-color: #71717A; /* zinc-500 */
+        }
+        html.dark .filter-btn-active {
+            background-color: #60A5FA; /* blue-400 */
+        }
+        html.dark .border-gray-200 {
+            border-color: #71717A; /* zinc-500 */
+        }
+        html.dark .bg-gray-100 {
+            background-color: #52525B; /* zinc-600 */
+            color: #FAFAFA;
+        }
+        html.dark .text-gray-500 {
+            color: #A1A1AA; /* zinc-400 */
+        }
+        html.dark .text-gray-800 {
+            color: #FAFAFA;
+        }
+        html.dark .text-emerald-600 {
+            color: #34D399; /* emerald-400 */
+        }
+        html.dark .hover\:text-emerald-800:hover {
+            color: #10B981; /* emerald-500 */
+        }
+        html.dark .bg-yellow-50 {
+            background-color: #92400E; /* amber-900 */
+            color: #FEF3C7; /* amber-100 */
+        }
+        html.dark .border-yellow-200 {
+            border-color: #FCD34D; /* amber-400 */
+        }
+        html.dark .text-yellow-700 {
+            color: #FCD34D; /* amber-400 */
+        }
+        html.dark .text-blue-600 {
+            color: #60A5FA; /* blue-400 */
+        }
+        html.dark .hover\:text-blue-800:hover {
+            color: #3B82F6; /* blue-500 */
+        }
+        html.dark .text-purple-600 {
+            color: #A78BFA; /* purple-400 */
+        }
+        html.dark .hover\:text-purple-800:hover {
+            color: #8B5CF6; /* purple-500 */
+        }
+        html.dark .text-orange-600 {
+            color: #FDBA74; /* orange-300 */
+        }
+        html.dark .hover\:text-orange-800:hover {
+            color: #FB923C; /* orange-400 */
+        }
+        /* Modal specific styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            max-width: 500px;
+            width: 90%;
+            animation: fadeIn 0.3s ease-out;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        html.dark .modal-content {
+            background-color: #3F3F46; /* zinc-700 */
+            color: #FAFAFA;
+        }
+        .modal-header {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .modal-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #475569; /* slate-700 */
+        }
+        html.dark .modal-label {
+            color: #D4D4D8; /* zinc-300 */
+        }
+        .modal-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #CBD5E1; /* slate-300 */
+            border-radius: 6px;
+            background-color: #F8FAFC; /* slate-50 */
+            color: #1E293B; /* slate-900 */
+            transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+        }
+        html.dark .modal-input {
+            border-color: #52525B; /* zinc-600 */
+            background-color: #27272A; /* zinc-900 */
+            color: #FAFAFA;
+        }
+        .modal-input:focus {
+            outline: none;
+            border-color: #3B82F6; /* blue-500 */
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+        .modal-btn-primary {
+            background-color: #3B82F6; /* blue-500 */
+            color: white;
+            border: 1px solid #3B82F6;
+        }
+        .modal-btn-primary:hover {
+            background-color: #2563EB; /* blue-600 */
+        }
+        .modal-btn-secondary {
+            background-color: #E2E8F0; /* slate-200 */
+            color: #475569; /* slate-700 */
+            border: 1px solid #E2E8F0;
+        }
+        .modal-btn-secondary:hover {
+            background-color: #CBD5E1; /* slate-300 */
+        }
+        html.dark .modal-btn-secondary {
+            background-color: #52525B; /* zinc-600 */
+            color: #FAFAFA;
+            border-color: #52525B;
+        }
+        html.dark .modal-btn-secondary:hover {
+            background-color: #71717A; /* zinc-500 */
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="min-h-screen relative z-10">
+        <header class="bg-white shadow-md sticky top-0 z-50 transition-colors duration-300">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Top Row: Logo, Title (Left) & Dark Mode Toggle (Right) -->
+                <div class="flex items-center justify-between py-4">
+                    <div class="flex items-center flex-shrink-0">
+                        <img src="https://scontent-ams2-1.xx.fbcdn.net/v/t39.30808-6/301514219_108577108643656_6063151945423570464_n.jpg?_nc_cat=104&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=6YjNl83JHFkQ7kNvwHS6qXf&_nc_oc=Admy7xImoB8ubbeZb_ES1VmulyrrU3COamEB51a1gjFk5BU1Bh6uOFYA19-FbFCTcXxNYDF01oMprNQKIFsRrtkp&_nc_zt=23&_nc_ht=scontent-ams2-1.xx&_nc_gid=AKTkcq-lzueSYYA8b17-0w&oh=00_AfTEqq5IVDJDW_67Yf4cLAp1e-DLvtq1Z4nKR_wZ82gy5g&oe=688C47BB" alt="NFT Weingarten Logo" class="h-12 w-12 rounded-full mr-2">
+                        <span class="text-base xs:text-base sm:text-lg md:text-xl font-bold text-blue-700 transition-colors duration-300 leading-tight">NFT Weingarten - Football Training Planner</span>
+                    </div>
+                    <div class="flex items-center flex-shrink-0 ml-4">
+                        <label for="darkModeToggle" class="flex items-center cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" id="darkModeToggle" class="sr-only peer">
+                                <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 peer-checked:translate-x-7"></div>
+                            </div>
+                            <div class="ml-3 text-gray-700 font-medium transition-colors duration-300 dark:text-gray-300 hidden sm:block">
+                                Dark Mode
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Second Row: Navigation Tabs -->
+                <nav class="flex flex-wrap justify-center space-x-1 sm:space-x-2 mt-2 border-b border-gray-200 dark:border-gray-700">
+                    <button data-target="home" class="nav-btn nav-active nav-tab transition-colors duration-300">Home</button>
+                    <button data-target="nutrition" class="nav-btn nav-inactive nav-tab transition-colors duration-300">Nutrition Plan</button>
+                    <button data-target="training" class="nav-btn nav-inactive nav-tab transition-colors duration-300">Training Plan</</button>
+                    <button data-target="gameplay-tips" class="nav-btn nav-inactive nav-tab transition-colors duration-300">Gameplay Tips</button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- Home Section -->
+            <section id="home" class="content-section active">
+                <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                    <h1 class="text-3xl font-bold text-gray-900 mb-4 text-left transition-colors duration-300">A Structured Plan for University Footballers</h1>
+                    <img src="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/0fb791ab-9e22-469b-8dd8-56e29c457a47/d8idf77-be43db02-d027-45db-9625-ff9f27026a2f.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzBmYjc5MWFiLTllMjItNDY5Yi04ZGQ4LTU2ZTI5YzQ1N2E0N1wvZDhpZGY3Ny1iZTQzZGIwMi1kMDI3LTQ1ZGItOTYyNS1mZjlmMjcwMjZhMmYuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.fLtmBWplzuGjSY4Sdc4fnoIjf28oeIvCCkRsQuwQm8o" alt="Football field with players" class="w-full max-w-xl mx-auto rounded-lg shadow-md my-6">
+                    <p class="text-lg text-gray-600 mb-3 text-justify transition-colors duration-300">Welcome to the official training and nutrition guide for NFT Weingarten, your university football team! Designed especially for our beginner-level student-athletes, this interactive plan provides a clear, organized roadmap to improve your physical fitness and build fundamental football skills. Use the navigation above to explore the sections tailored just for you:
+                        <ul class="list-disc list-inside space-y-1 text-gray-800">
+                            <li>
+                                <strong>Nutrition Plan:</strong> Good and bad foods for footballers and eating tips
+                            </li>
+                            <li>
+                                <strong>Training Plan:</strong> Different YouTube videos based on drills like passing, shooting, etc.
+                            </li>
+                            <li>
+                                <strong>Gameplay Tips:</strong> Tips for players in different roles (forward, goalkeeper, etc.) with suitable YouTube videos
+                            </li>
+                        </ul>
+                    </p>
+                    <div class="p-6 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg transition-colors duration-300">
+                        <h2 class="text-xl font-semibold text-emerald-800 text-left transition-colors duration-300">The Synergy of Nutrition and Training</h2>
+                        <p class="text-emerald-700 text-justify transition-colors duration-300">For any athlete, peak performance is not just about training; it's profoundly influenced by proper fueling. The success of any training regimen is significantly enhanced by smart nutritional habits. For a university team, optimizing daily food choices often yields more substantial and sustainable improvements than relying on training alone. This plan is built on that synergy, combining a "food first" philosophy with a structured training program to help you achieve your best on the field.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Nutrition Section -->
+            <section id="nutrition" class="content-section">
+                <div class="space-y-8">
+                    <!-- General Principles -->
+                    <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6 text-left transition-colors duration-300">Part 1: Fueling Peak Performance</h2>
+                        <p class="text-lg text-gray-600 mb-8 text-justify max-w-3xl mx-auto transition-colors duration-300">A well-designed nutrition plan is fundamental for amateur football players, impacting energy levels, recovery, and overall physical condition. This section breaks down the core principles of athlete nutrition, from daily macronutrient needs to specific game-day fueling strategies.</p>
+                        
+                        <div class="grid md:grid-cols-2 gap-8 items-center">
+                            <div>
+                                <h3 class="text-xl font-semibold text-gray-800 mb-4 text-left transition-colors duration-300">Daily Macronutrient Goals</h3>
+                                <p class="text-gray-600 mb-4 text-justify transition-colors duration-300">Football is a demanding sport that relies heavily on carbohydrates for fuel. A balanced intake of carbs, protein, and healthy fats is essential for energy, muscle repair, and overall health. Aim for a diet where 55-60% of your calories come from carbohydrates.</p>
+                                <ul class="space-y-3 text-gray-600 transition-colors duration-300">
+                                    <li><span class="font-semibold text-emerald-600 transition-colors duration-300">Carbohydrates (55-60%):</span> The primary fuel for high-intensity efforts. Focus on complex carbs like whole grains, potatoes, and beans.</li>
+                                    <li><span class="font-semibold text-blue-600 transition-colors duration-300">Protein (~15-20%):</span> Crucial for muscle repair and growth after training. Opt for lean sources like chicken, fish, and legumes.</li>
+                                    <li><span class="font-semibold text-amber-600 transition-colors duration-300">Healthy Fats (~20-25%):</span> Essential for overall health. Choose sources like avocados, nuts, and olive oil.</li>
+                                </ul>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="macroChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Foods to Emphasize/Avoid -->
+                    <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                         <h3 class="text-xl font-semibold text-gray-800 mb-6 text-left transition-colors duration-300">Your Footballer's Shopping List</h3>
+                         <div class="grid md:grid-cols-2 gap-8">
+                            <div class="p-6 rounded-lg border border-emerald-200 transition-colors duration-300">
+                                <h4 class="text-lg font-bold text-emerald-700 mb-4 transition-colors duration-300">✅ Foods to Emphasize</h4>
+                                <ul class="space-y-2" id="emphasize-foods">
+                                    <li><strong class="text-gray-700 transition-colors duration-300">Carbohydrates:</strong> Whole-wheat pasta, brown rice, quinoa, potatoes, whole-grain bread, oats, bananas, berries, beans, lentils.</li>
+                                    <li><strong class="text-gray-700 transition-colors duration-300">Lean Proteins:</strong> Grilled chicken, turkey, fish (salmon, tuna), eggs, legumes, low-fat dairy (yogurt, milk), nuts.</li>
+                                    <li><strong class="text-gray-700 transition-colors duration-300">Healthy Fats:</strong> Olive oil, avocados, nuts (almonds, walnuts), seeds, nut butters.</li>
+                                    <li><strong class="text-gray-700 transition-colors duration-300">Hydration:</strong> Water is key! Sports drinks can be useful for sessions over 60-90 minutes.</li>
+                                </ul>
+                            </div>
+                             <div class="p-6 rounded-lg border border-red-200 transition-colors duration-300">
+                                <h4 class="text-lg font-bold text-red-700 mb-4 transition-colors duration-300">❌ Foods to Limit or Avoid</h4>
+                                <ul class="space-y-2" id="avoid-foods">
+                                    <li><strong class="text-gray-700 transition-colors duration-300">Sugary/Processed Foods:</strong> Sweets, pastries, soda, sugary granola bars, chips. These cause energy crashes.</li>
+                                    <li><strong class="text-gray-700 transition-colors duration-300">Fatty/Fried Foods:</strong> Fried chicken, fries, greasy pizza, bacon. They are slow to digest and can make you feel sluggish.</li>
+                                    <li><strong class="gray-700 transition-colors duration-300">High-Fiber Foods (Pre-Game):</strong> Large amounts of beans or vegetables right before a game can cause stomach issues.</li>
+                                    <li><strong class="text-gray-700 transition-colors duration-300">Energy Drinks:</strong> Discouraged due to potential adverse health effects and reliance on stimulants over real nutrition.</li>
+                                </ul>
+                            </div>
+                         </div>
+                    </div>
+
+                    <!-- LLM Feature: Generate Meal Idea -->
+                    <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 text-left transition-colors duration-300">✨ AI-Powered Meal Ideas</h3>
+                        <p class="text-gray-600 mb-4 text-justify transition-colors duration-300">Need inspiration for your next meal? Let our AI suggest a tailored idea!</p>
+                        <button id="generateMealBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 text-lg">
+                            Generate a Meal Idea ✨
+                        </button>
+                        <div id="mealOutput" class="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 transition-colors duration-300" style="min-height: 50px;">
+                            Your meal idea will appear here.
+                        </div>
+                    </div>
+
+                    <!-- Game Day Fueling -->
+                    <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-8 text-left transition-colors duration-300">Game Day Fueling Timeline</h3>
+                        <div class="relative">
+                            <!-- Vertical line -->
+                            <div class="absolute left-1/2 transform -translate-x-1/2 h-full w-0.5 bg-gray-200 dark:bg-gray-700 transition-colors duration-300" aria-hidden="true"></div>
+                            <div class="space-y-12">
+                                <!-- Timeline Item 1 -->
+                                <div class="relative flex items-center">
+                                    <div class="hidden md:block w-1/2 pr-8 text-right">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">Night Before Game</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Focus on a carb-rich meal like pasta or rice with lean protein to build up energy stores. Hydrate well.</p>
+                                        </div>
+                                    </div>
+                                    <div class="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900 transition-colors duration-300"></div>
+                                    <div class="md:hidden w-full pl-8">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">Night Before Game</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Focus on a carb-rich meal like pasta or rice with lean protein to build up energy stores. Hydrate well.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Timeline Item 2 -->
+                                <div class="relative flex items-center">
+                                    <div class="w-full md:w-1/2 md:pl-8">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">3-4 Hours Before Game</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Eat a balanced meal: whole-grain carbs, lean protein, and healthy fats. Drink 17-20 oz of water/sports drink.</p>
+                                        </div>
+                                    </div>
+                                    <div class="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900 transition-colors duration-300"></div>
+                                </div>
+                                <!-- Timeline Item 3 -->
+                                <div class="relative flex items-center">
+                                    <div class="hidden md:block w-1/2 pr-8 text-right">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">1 Hour Before Game</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Have a light, carb-rich snack like a banana, pretzels, or a small bagel. Avoid high-fat or high-protein foods.</p>
+                                        </div>
+                                    </div>
+                                    <div class="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900 transition-colors duration-300"></div>
+                                    <div class="md:hidden w-full pl-8">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">1 Hour Before Game</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Have a light, carb-rich snack like a banana, pretzels, or a small bagel. Avoid high-fat or high-protein foods.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Timeline Item 4 -->
+                                <div class="relative flex items-center">
+                                    <div class="w-full md:w-1/2 md:pl-8">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">During the Game</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Sip 3-6 oz of water/sports drink every 15-20 mins. Small snacks like orange slices or a half banana can help maintain energy.</p>
+                                        </div>
+                                    </div>
+                                    <div class="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900 transition-colors duration-300"></div>
+                                </div>
+                                <!-- Timeline Item 5 -->
+                                 <div class="relative flex items-center">
+                                    <div class="hidden md:block w-1/2 pr-8 text-right">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">Post-Game Recovery (within 1 hour)</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Crucial window! Consume a meal/snack with both protein and carbs to repair muscle and replenish energy. Chocolate milk is a great option.</p>
+                                        </div>
+                                    </div>
+                                    <div class="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900 transition-colors duration-300"></div>
+                                    <div class="md:hidden w-full pl-8">
+                                        <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg shadow transition-colors duration-300">
+                                            <p class="font-semibold text-gray-800 dark:text-gray-100 transition-colors duration-300">Post-Game Recovery (within 1 hour)</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 text-justify transition-colors duration-300">Crucial window! Consume a meal/snack with both protein and carbs to repair muscle and replenish energy. Chocolate milk is a great option.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Training Section -->
+            <section id="training" class="content-section">
+                <div class="space-y-12">
+                     <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6 text-left transition-colors duration-300">Part 2: Building Athleticism and Skill</h2>
+                        <p class="text-lg text-gray-600 mb-8 text-justify max-w-3xl mx-auto font-normal transition-colors duration-300">Developing a strong physical foundation and sharp technical skills is essential for success on the field. This section provides a library of drills you can filter by category. It also includes a sample weekly schedule to help structure your training.</p>
+
+                        <!-- Filter Buttons -->
+                        <div class="flex flex-wrap justify-center gap-2 mb-8" id="filter-container">
+                            <button class="filter-btn filter-btn-active px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300" data-filter="all">All Drills</button>
+                            <button data-filter="stamina" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Stamina</button>
+                            <button data-filter="strength" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Strength</button>
+                            <button data-filter="flexibility" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Flexibility</button>
+                            <button data-filter="passing" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Passing</button>
+                            <button data-filter="receiving" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Receiving/First Touch</button>
+                            <button data-filter="dribbling" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Dribbling</button>
+                            <button data-filter="shooting" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Shooting</button>
+                            <button data-filter="defending" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Defending</button>
+                            <button data-filter="communication" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Communication</button>
+                            <button data-filter="goalkeeping" class="filter-btn filter-btn-inactive px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300">Goalkeeping</button>
+                        </div>
+
+                        <!-- Drill Cards Grid -->
+                        <div id="drills-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <!-- JS will populate this section -->
+                        </div>
+                    </div>
+
+                    <!-- LLM Feature: Suggest Custom Drill -->
+                    <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 text-left transition-colors duration-300">✨ AI-Powered Drill Suggestion</h3>
+                        <p class="text-gray-600 mb-4 text-justify transition-colors duration-300">Looking for a specific drill? Describe what you need, and our AI will suggest one!</p>
+                        <button id="suggestDrillBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 text-lg">
+                            Suggest a Custom Drill ✨
+                        </button>
+                        <div id="drillOutput" class="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 transition-colors duration-300" style="min-height: 50px;">
+                            Your drill suggestion will appear here.
+                        </div>
+                    </div>
+
+                    <!-- Weekly Schedule -->
+                    <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-6 text-left transition-colors duration-300">Sample Weekly Training Schedule</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="py-3 px-4 bg-gray-100 dark:bg-gray-700 font-semibold text-sm text-gray-600 dark:text-gray-300 border-b dark:border-gray-600 transition-colors duration-300">Day</th>
+                                        <th class="py-3 px-4 bg-gray-100 dark:bg-gray-700 font-semibold text-sm text-gray-600 dark:text-gray-300 border-b dark:border-gray-600 transition-colors duration-300">Focus Area</th>
+                                        <th class="py-3 px-4 bg-gray-100 dark:bg-gray-700 font-semibold text-sm text-gray-600 dark:text-gray-300 border-b dark:border-gray-600 transition-colors duration-300">Sample Activities</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white dark:bg-gray-800 transition-colors duration-300">
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 font-medium transition-colors duration-300">Monday</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 transition-colors duration-300">Stamina & Passing</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 transition-colors duration-300">Dynamic Warm-up, Stop-and-Go Drills, Shuttle Runs, Lead Passing Pairs, Rondos, Static Cool-down.</td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 font-medium transition-colors duration-300">Wednesday</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 transition-colors duration-300">Strength & Dribbling/Shooting</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 transition-colors duration-300">Dynamic Warm-up, Bodyweight Circuit (Squats, Lunges, Push-ups, Planks), Cone Dribbling, Rapid Fire Shooting, Static Cool-down.</td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 font-medium transition-colors duration-300">Friday</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 transition-colors duration-300">Defending & Small-Sided Games</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 transition-colors duration-300">Dynamic Warm-up, 1v1 Defending Drills, Pressure-Cover-Balance Games, Tackling Exercises, Static Cool-down.</td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 font-medium transition-colors duration-300">Optional Days</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 transition-colors duration-300">Skill Refinement & Recovery</td>
+                                        <td class="py-3 px-4 border-b dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 transition-colors duration-300">Individual dribbling moves, extra shooting practice, light cardio (swimming/cycling), extended flexibility work.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg transition-colors duration-300">
+                            <h4 class="text-lg font-semibold text-blue-800 mb-2 text-left transition-colors duration-300">Progressive Overload: The Key to Improvement</h4>
+                            <p class="text-blue-700 text-justify transition-colors duration-300">To keep getting fitter and stronger, you must continuously challenge your body. This is called progressive overload. As you get used to the drills, gradually increase the challenge by: 1) Increasing <span class="font-bold">Volume</span> (more reps/sets), 2) Increasing <span class="font-bold">Intensity</span> (faster pace, less rest), or 3) Increasing <span class="font-bold">Complexity</span> (adding a defender or combining skills).</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gameplay Tips Section -->
+            <section id="gameplay-tips" class="content-section">
+                <div class="bg-white p-8 rounded-lg shadow-lg transition-colors duration-300">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6 text-left transition-colors duration-300">Part 3: In-Game Strategies & Role-Specific Tips</h2>
+                    <p class="text-lg text-gray-600 mb-8 text-justify max-w-3xl mx-auto font-normal transition-colors duration-300">Understanding tactical roles and applying smart strategies during a game can significantly elevate individual and team performance. This section provides detailed gameplay tips for key positions, focusing on how to make a real impact when it matters most.</p>
+
+                    <div class="space-y-10">
+                        <!-- Striker Tips -->
+                        <div class="p-6 bg-white rounded-lg border border-gray-200 transition-colors duration-300 dark:bg-gray-800 dark:border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-50 mb-4 flex items-center transition-colors duration-300">
+                                🏃‍♂️ Striker: Clinical Finishing & Dynamic Movement
+                            </h3>
+                            <div id="striker-focus" class="text-black dark:text-gray-100 mb-4 text-justify transition-colors duration-300">
+                                <!-- Content dynamically populated by JS -->
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <span class="font-semibold text-gray-900 dark:text-gray-100">Useful Videos:</span>
+                                <ul id="striker-videos">
+                                    <!-- Videos will be populated by JS -->
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Midfielder Tips -->
+                        <div class="p-6 bg-white rounded-lg border border-gray-200 transition-colors duration-300 dark:bg-gray-800 dark:border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-50 mb-4 flex items-center transition-colors duration-300">
+                                🧠 Midfielder: The Engine & Playmaker
+                            </h3>
+                            <div id="midfielder-focus" class="text-black dark:text-gray-100 mb-4 text-justify transition-colors duration-300">
+                                <!-- Content dynamically populated by JS -->
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <span class="font-semibold text-gray-900 dark:text-gray-100">Useful Videos:</span>
+                                <ul id="midfielder-videos">
+                                    <!-- Videos will be populated by JS -->
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Defender Tips -->
+                        <div class="p-6 bg-white rounded-lg border border-gray-200 transition-colors duration-300 dark:bg-gray-800 dark:border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-50 mb-4 flex items-center transition-colors duration-300">
+                                🛡️ Defender: The Wall & Organizer
+                            </h3>
+                            <div id="defender-focus" class="text-black dark:text-gray-100 mb-4 text-justify transition-colors duration-300">
+                                <!-- Content dynamically populated by JS -->
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <span class="font-semibold text-gray-900 dark:text-gray-100">Useful Videos:</span>
+                                <ul id="defender-videos">
+                                    <!-- Videos will be populated by JS -->
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Goalkeeper Tips -->
+                        <div class="p-6 bg-white rounded-lg border border-gray-200 transition-colors duration-300 dark:bg-gray-800 dark:border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-50 mb-4 flex items-center transition-colors duration-300">
+                                🧤 Goalkeeper: The Last Line & First Attacker
+                            </h3>
+                            <div id="goalkeeper-focus" class="text-black dark:text-gray-100 mb-4 text-justify transition-colors duration-300">
+                                <!-- Content dynamically populated by JS -->
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <span class="font-semibold text-gray-900 dark:text-gray-100">Useful Videos:</span>
+                                <ul id="goalkeeper-videos">
+                                    <!-- Videos will be populated by JS -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Custom Input Modal -->
+    <div id="inputModal" class="modal flex">
+        <div class="modal-content">
+            <h3 id="modalTitle" class="modal-header"></h3>
+            <label id="modalLabel1" for="modalInput1" class="modal-label"></label>
+            <input type="text" id="modalInput1" class="modal-input" placeholder="">
+
+            <label id="modalLabel2" for="modalInput2" class="modal-label" style="display: none;"></label>
+            <input type="text" id="modalInput2" class="modal-input" placeholder="" style="display: none;">
+
+            <div class="modal-actions">
+                <button id="modalCancelBtn" class="modal-btn modal-btn-secondary">Cancel</button>
+                <button id="modalConfirmBtn" class="modal-btn modal-btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Definitions
+        const homePageImage = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/0fb791ab-9e22-469b-8dd8-56e29c457a47/d8idf77-be43db02-d027-45db-9625-ff9f27026a2f.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzBmYjc5MWFiLTllMjItNDY5Yi04ZGQ4LTU2ZTI5YzQ1N2E0N1wvZDhpZGY3Ny1iZTQzZGIwMi1kMDI3LTQ1ZGItOTYyNS1mZjlmMjcwMjZhMmYuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.fLtmBWplzuGjSY4Sdc4fnoIjf28oeIvCCkRsQuwQm8o";
+
+        // Drills organized by category for better maintainability and filtering
+        // Videos are objects with title and url
+        const drillsByCategory = {
+            stamina: [
+                {
+                    name: 'Interval Running', category: 'stamina', importance: 'High', difficulty: 'Beginner-Intermediate', desc: 'Alternate between jogging and sprinting to improve cardiovascular fitness.',
+                    videos: [
+                        {
+                            title: 'How to improve you stamina?',
+                            url: 'https://www.youtube.com/shorts/ceCxQOfQO8I'
+                        },
+                        {
+                            title: 'How to increase your stamina?',
+                            url: 'https://www.youtube.com/watch?v=Ln04yGXCyGA'
+                        }
+                    ]
+                },
+                {
+                    name: 'Stop-and-Go Drills', category: 'stamina', importance: 'High', difficulty: 'Beginner-Intermediate', desc: 'Develop speed and explosive acceleration while mimicking game intensity.',
+                    videos: [
+                        {
+                            title: 'SoccerCoachTV - "Stop and Go" Dribbling Move.',
+                            url: 'https://www.youtube.com/watch?v=7z0GQ0IC6u8&list=PLBh7zVlskJd4-GcjM3_E24kBxB54hlE7J'
+                        },
+                        {
+                            title: 'Ball Mastery | Stop and Go - Fakes | Soccer Drills - Football Exercises',
+                            url: 'https://www.youtube.com/watch?v=1ytvF10VGYQ'
+                        }
+                    ]
+                },
+                {
+                    name: 'Shuttle Runs', category: 'stamina', importance: 'High', difficulty: 'Beginner-Intermediate', desc: 'Improve speed, acceleration, and ability to make quick changes of direction.',
+                    videos: [
+                        {
+                            title: 'How to run a good 5-10-5 shuttle',
+                            url: 'https://www.youtube.com/shorts/AVRhI8bX7ys'
+                        },
+                        {
+                            title: '8 Cone Snake Drill Sprint Shuffle Sprint',
+                            url: 'https://www.youtube.com/shorts/Jmunmr5ocgo'
+                        }
+                    ]
+                },
+            ],
+            strength: [
+                {
+                    name: 'Planks', category: 'strength', importance: 'High', difficulty: 'Beginner', desc: 'Build essential core strength for balance, stability, and injury prevention.',
+                    videos: [
+                        {
+                            title: 'How to do a Plank',
+                            url: 'https://www.youtube.com/watch?v=ASdvN_XEl_c'
+                        },
+                        {
+                            title: 'Beginner Core Plank Exercise',
+                            url: 'https://www.youtube.com/watch?v=T_E5_hVzBKY'
+                        }
+                    ]
+                },
+                {
+                    name: 'Bodyweight Squats', category: 'strength', importance: 'High', difficulty: 'Beginner', desc: 'Build foundational strength in the legs and glutes for power and stability.',
+                    videos: [
+                        {
+                            title: 'Perfect Squat Form Tutorial',
+                            url: 'https://www.youtube.com/watch?v=IZ9cgmUf8wc'
+                        },
+                        {
+                            title: 'Bodyweight Squat for Beginners',
+                            url: 'https://www.youtube.com/watch?v=C_Vt6n7-sR8'
+                        }
+                    ]
+                },
+                {
+                    name: 'Lunges', category: 'strength', importance: 'High', difficulty: 'Beginner', desc: 'Develop leg strength and balance, working each leg independently.',
+                    videos: [
+                        {
+                            title: 'Lunge Exercise Guide',
+                            url: 'https://www.youtube.com/watch?v=Pbmj6xPo-Hw'
+                        },
+                        {
+                            title: 'Walking Lunges Technique',
+                            url: 'https://www.youtube.com/watch?v=L4pSWNq_bfk'
+                        }
+                    ]
+                },
+                {
+                    name: 'Push-ups', category: 'strength', importance: 'Medium', difficulty: 'Beginner', desc: 'Build upper body and core strength, beneficial for duels and overall stability.',
+                    videos: [
+                        {
+                            title: 'Perfect Push-up Form',
+                            url: 'https://www.youtube.com/watch?v=IODxDxX7oi4'
+                        },
+                        {
+                            title: 'Push-ups for Beginners',
+                            url: 'https://www.youtube.com/watch?v=R0_D95l0jI0'
+                        }
+                    ]
+                },
+                {
+                    name: 'Sit-ups/Leg Raises', category: 'strength', importance: 'High', difficulty: 'Beginner', desc: 'Strengthen core muscles for stability, power generation, and injury prevention.',
+                    videos: [
+                        {
+                            title: 'How to do Sit-ups',
+                            url: 'https://www.youtube.com/watch?v=1t202q-s44w'
+                        },
+                        {
+                            title: 'Leg Raises for Strong Abs',
+                            url: 'https://www.youtube.com/watch?v=l4kR8V27U2k'
+                        }
+                    ]
+                },
+            ],
+            flexibility: [
+                {
+                    name: 'Dynamic Stretches (Warm-up)', category: 'flexibility', importance: 'Medium', difficulty: 'Beginner', desc: 'Prepare muscles for activity. Includes leg swings, high knees, butt kicks.',
+                    videos: [
+                        {
+                            title: 'Dynamic Warm-up for Football',
+                            url: 'https://www.youtube.com/watch?v=_koAkJJVT7Y'
+                        },
+                        {
+                            title: 'Full Body Dynamic Stretching',
+                            url: 'https://www.youtube.com/watch?v=QAFVV6bO2mE'
+                        }
+                    ]
+                },
+                {
+                    name: 'Static Stretches (Cool-down)', category: 'flexibility', importance: 'Medium', difficulty: 'Beginner', desc: 'Aid muscle recovery after training. Includes hamstring, quad, and calf stretches.',
+                    videos: [
+                        {
+                            title: 'Football Cool Down Stretches',
+                            url: 'https://www.youtube.com/watch?v=rAjFN1GvCw0'
+                        },
+                        {
+                            title: 'Post-Workout Static Stretches',
+                            url: 'https://www.youtube.com/watch?v=TCdVB-GiWoc'
+                        }
+                    ]
+                },
+            ],
+            passing: [
+                {
+                    name: 'Basic', category: 'passing', importance: 'High', difficulty: 'Beginner', desc: 'Improve your basic passing skills to keep possession and build effective plays.',
+                    videos: [
+                        {
+                            title: 'The 3 KEYS to Passing',
+                            url: 'https://www.youtube.com/watch?v=ve2DygmFlMc'
+                        },
+                        {
+                            title: 'How to Pass Like a Professional',
+                            url: 'https://www.youtube.com/watch?v=wLDgGMt3aU8'
+                        },
+                        {
+                            title: 'The 3 most used passes in game',
+                            url: 'https://www.youtube.com/watch?v=3Pc4NeKM-a8'
+                        }
+                    ]
+                },
+                {
+                    name: 'Lead Passing Pairs', category: 'passing', importance: 'High', difficulty: 'Beginner', desc: 'Improve first touch, short-range passing accuracy, and combination play.',
+                    videos: [
+                        {
+                            title: 'PASSING DRILL FOR FOOTBALL',
+                            url: 'https://www.youtube.com/shorts/ZtAO8CyvG5Y'
+                        },
+                        {
+                            title: '2 & 3 Player Soccer/Football Passing Drills',
+                            url: 'https://www.youtube.com/watch?v=cD24CC3NDJs'
+                        }
+                    ]
+                },
+                {
+                    name: 'Rondos', category: 'passing', importance: 'High', difficulty: 'Beginner-Intermediate', desc: 'Improve possession, quick passing, and decision-making under pressure.',
+                    videos: [
+                        {
+                            title: 'Soccer Drill: The Rondo',
+                            url: 'https://www.youtube.com/shorts/8n-1EaMTJKw'
+                        },
+                        {
+                            title: '4v2 Rondo with Small Goals',
+                            url: 'https://www.youtube.com/watch?v=DIHAMJyVkKU'
+                        }
+                    ]
+                },
+                {
+                    name: 'Wall Pass Drills', category: 'passing', importance: 'High', difficulty: 'Beginner', desc: 'Improve passing accuracy, first touch, and quick one-two combinations using a wall or partner.',
+                    videos: [
+                        {
+                            title: 'Wall Pass Technique',
+                            url: 'https://www.youtube.com/watch?v=cM0XfGk_c0c'
+                        },
+                        {
+                            title: 'One-Two Wall Pass Drill',
+                            url: 'https://www.youtube.com/watch?v=4YmD06n4f8o'
+                        }
+                    ]
+                },
+            ],
+            receiving: [
+                {
+                    name: 'Receiving', category: 'receiving', importance: 'High', difficulty: 'Beginner', desc: 'Master controlling the ball efficiently upon reception to set up the next action.',
+                    videos: [
+                        {
+                            title: '3 Super Easy First Touch Fixes',
+                            url: 'https://www.youtube.com/watch?v=7BEqCvQRFGU'
+                        },
+                        {
+                            title: 'First Touch Mistakes and How to Fix Them',
+                            url: 'https://www.youtube.com/shorts/SXJbL7BnCGM'
+                        },
+                        {
+                            title: 'Tips on receiving back foot',
+                            url: 'https://www.youtube.com/shorts/L035qmI0-Ww'
+                        }
+                    ]
+                },
+                {
+                    name: 'Juggling (Ball Control)', category: 'receiving', importance: 'Medium', difficulty: 'Beginner', desc: 'Improve overall ball feel, touch, and coordination by keeping the ball in the air without letting it touch the ground.',
+                    videos: [
+                        {
+                            title: 'The Art of Juggling',
+                            url: 'https://www.youtube.com/watch?v=a4Po0DwL9WI'
+                        },
+                        {
+                            title: 'Why are you juggling like that?',
+                            url: 'https://www.youtube.com/watch?v=Nx_h4FMKCWE'
+                        },
+                        {
+                            title: 'Is Juggling Useless?',
+                            url: 'https://www.youtube.com/watch?v=wecc5JyGq2c'
+                        }
+                    ]
+                },
+            ],
+            dribbling: [
+                {
+                    name: 'Dribbling', category: 'dribbling', importance: 'High', difficulty: 'Beginner', desc: 'Improve ball control, agility, and the ability to use both feet effectively.',
+                    videos: [
+                        {
+                            title: 'Why are you dribbling it like that?',
+                            url: 'https://www.youtube.com/watch?v=xAEsp3QEquw'
+                        },
+                        {
+                            title: 'INSTANTLY improve dribbling with these!',
+                            url: 'https://www.youtube.com/shorts/rhRDXvlPoFQ'
+                        },
+                        {
+                            title: 'Learn The Art of CLOSE CONTROL',
+                            url: 'https://www.youtube.com/watch?v=9Vc2OY7MiSw'
+                        }
+                    ]
+                },
+                {
+                    name: 'Moves to Beat Defenders', category: 'dribbling', importance: 'Medium', difficulty: 'Beginner-Intermediate', desc: 'Learn basic moves like the step-over to unbalance defenders in 1v1 situations.',
+                    videos: [
+                        {
+                            title: '5 DEADLY 1v1 Skills That WORK Every Time!',
+                            url: 'https://www.youtube.com/watch?v=oCf1QZPXzVY'
+                        },
+                        {
+                            title: 'The 3 easy ways to ALWAYS beat defenders',
+                            url: 'https://www.youtube.com/watch?v=0uU7nqi9UqE'
+                        },
+                        {
+                            title: 'These 5 Skills Will Make You a GOOD Player',
+                            url: 'https://www.youtube.com/watch?v=oyzHK5WUjlY'
+                        }
+                    ]
+                },
+            ],
+            shooting: [
+                {
+                    name: 'Shooting Drills', category: 'shooting', importance: 'High', difficulty: 'Beginner', desc: 'Maximize shots on goal, practice proper technique, and finish with both feet.',
+                    videos: [
+                        {
+                            title: '5 Essential Shooting Drills Every Player Should Master',
+                            url: 'https://www.youtube.com/watch?v=tcoRi1OxFmo'
+                        },
+                        {
+                            title: '7 WAYS to Improve SHOOTING for Beginners!',
+                            url: 'https://www.youtube.com/watch?v=uSPCV-w2Y7I'
+                        },
+                        {
+                            title: 'How to Shoot Like a Professional',
+                            url: 'https://www.youtube.com/watch?v=yknNswB_lps'
+                        },
+                        {
+                            title: 'THE CRAZY Shot Power Tutorial',
+                            url: 'https://www.youtube.com/watch?v=CZYfwV2qTqA'
+                        }
+                    ]
+                },
+                {
+                    name: 'Drive at Goal (Laces Shot)', category: 'shooting', importance: 'High', difficulty: 'Beginner', desc: 'Develop powerful, accurate shots using the laces for direct strikes.',
+                    videos: [
+                        {
+                            title: 'SHOOTING TECHNQIUE: Laces',
+                            url: 'https://www.youtube.com/shorts/qwM22Zl7Hxs'
+                        },
+                        {
+                            title: 'You shoot like an Amateur',
+                            url: 'https://www.youtube.com/watch?v=JDk-1grsPd0'
+                        },
+                        {
+                            title: 'The 4 KEYS to Shooting',
+                            url: 'https://www.youtube.com/shorts/bkFYyItrqG8'
+                        }
+                    ]
+                },
+                {
+                    name: 'Curling Shot (Inside/Outside)', category: 'shooting', importance: 'Medium', difficulty: 'Intermediate', desc: 'Learn to bend the ball for finesse shots, adding versatility to your attack.',
+                    videos: [
+                        {
+                            title: 'EFFORTLESS CURLER EXPLAINED',
+                            url: 'https://www.youtube.com/shorts/TueMO4XqvzE'
+                        },
+                        {
+                            title: 'How to Shoot with the Outside of the Foot Tutorial /Trivela',
+                            url: 'https://www.youtube.com/shorts/2_ORm8AWSnE'
+                        }
+                    ]
+                },
+                {
+                    name: 'Heading (Attacking/Defensive)', category: 'shooting', importance: 'Medium', difficulty: 'Beginner', desc: 'Practice heading the ball for clearances in defense and scoring opportunities in attack.',
+                    videos: [
+                        {
+                            title: 'How to do HEADING',
+                            url: 'https://www.youtube.com/shorts/pee8s-YfRpQ'
+                        },
+                        {
+                            title: 'Improve Your Heading With These Drills',
+                            url: 'https://www.youtube.com/shorts/DqOVjbglg0M'
+                        },
+                        {
+                            title: 'Simple tips to become a header MONSTER',
+                            url: 'https://www.youtube.com/shorts/1s4TktgbdGM'
+                        }
+                    ]
+                },
+            ],
+            defending: [
+                {
+                    name: '1v1 Defending Stance', category: 'defending', importance: 'High', difficulty: 'Beginner', desc: 'Master the basic defensive stance for closing down space and jockeying.',
+                    videos: [
+                        {
+                            title: '1v1 Defending Basics',
+                            url: 'https://www.youtube.com/watch?v=sjHLU8CQkQw'
+                        },
+                        {
+                            title: 'Jockeying Technique for Defenders',
+                            url: 'https://www.youtube.com/watch?v=0kF8N-hL098'
+                        }
+                    ]
+                },
+                {
+                    name: 'Pressure, Cover, Balance', category: 'defending', importance: 'High', difficulty: 'Intermediate', desc: 'Understand and apply team defensive principles in small-sided games.',
+                    videos: [
+                        {
+                            title: 'Pressure Cover Balance Drill',
+                            url: 'https://www.youtube.com/watch?v=gHVXwse0MU8'
+                        },
+                        {
+                            title: 'Team Defending Principles Soccer',
+                            url: 'https://www.youtube.com/watch?v=g-ilGlpfeCA'
+                        }
+                    ]
+                },
+                {
+                    name: 'Tackling Exercises (1v1 & Alone)', category: 'defending', importance: 'Medium', difficulty: 'Beginner', desc: 'Improve tackling technique and confidence in winning the ball from opponents.',
+                    videos: [
+                        {
+                            title: 'How to Tackle in Football',
+                            url: 'https://www.youtube.com/watch?v=9O6EEYzQ6NU'
+                        },
+                        {
+                            title: 'Individual Tackling Drills',
+                            url: 'https://www.youtube.com/watch?v=11X42H4g0jU'
+                        }
+                    ]
+                },
+            ],
+            communication: [
+                {
+                    name: 'Silent Possession Rondo', category: 'communication', importance: 'High', difficulty: 'Beginner-Intermediate', desc: 'Strengthen non-verbal communication and positional awareness; players must rely on eye contact and gestures.',
+                    videos: [
+                        {
+                            title: 'Silent Rondo Drill',
+                            url: 'https://www.youtube.com/watch?v=0Q7Q_g0rJjQ'
+                        },
+                        {
+                            title: 'Non-Verbal Communication in Soccer',
+                            url: 'https://www.youtube.com/watch?v=wX1d2eF7q14'
+                        }
+                    ]
+                },
+                {
+                    name: 'Call-and-Move Grid', category: 'communication', importance: 'Medium', difficulty: 'Beginner', desc: 'Develop verbal communication under movement; every pass must be preceded by the receiver calling for it.',
+                    videos: [
+                        {
+                            title: 'Verbal Communication Drill Soccer',
+                            url: 'https://www.youtube.com/watch?v=g-ilGlpfeCA'
+                        },
+                        {
+                            title: 'Call and Move Passing Practice',
+                            url: 'https://www.youtube.com/watch?v=3u_sH21_Y1w'
+                        }
+                    ]
+                },
+            ],
+            goalkeeping: [
+                {
+                    name: 'Goalkeeper Basic Catching', category: 'goalkeeping', importance: 'High', difficulty: 'Beginner', desc: 'Fundamental drills for securely catching and holding the ball from various angles and heights.',
+                    videos: [
+                        {
+                            title: 'Goalkeeper Catching Drills',
+                            url: 'https://www.youtube.com/watch?v=vVj_s-mK2-o'
+                        },
+                        {
+                            title: 'Basic Goalie Handling Techniques',
+                            url: 'https://www.youtube.com/watch?v=rXy8tB_yP5Y'
+                        }
+                    ]
+                },
+                {
+                    name: 'Goalkeeper Low Diving', category: 'goalkeeping', importance: 'High', difficulty: 'Beginner-Intermediate', desc: 'Practice diving low to save ground shots, focusing on proper form and technique.',
+                    videos: [
+                        {
+                            title: 'Low Dive Goalkeeper Drill',
+                            url: 'https://www.youtube.com/watch?v=jK_K-Xp6K3w'
+                        },
+                        {
+                            title: 'Goalkeeper Diving Technique for Low Shots',
+                            url: 'https://www.youtube.com/watch?v=KdY7BFZeoCQ'
+                        }
+                    ]
+                },
+                {
+                    name: 'Goalkeeper High Ball & Crosses', category: 'goalkeeping', importance: 'Medium', difficulty: 'Intermediate', desc: 'Improve handling of crosses and high balls, judging flight, and making appropriate saves.',
+                    videos: [
+                        {
+                            title: 'Catching Crosses Goalie Training',
+                            url: 'https://www.youtube.com/watch?v=XhI2m8n_rN8'
+                        },
+                        {
+                            title: 'High Ball Goalkeeper Drills',
+                            url: 'https://www.youtube.com/watch?v=x0X7-Hh4p5Q'
+                        }
+                    ]
+                },
+                {
+                    name: 'Goalkeeper Distribution (Throwing/Kicking)', category: 'goalkeeping', importance: 'Medium', difficulty: 'Beginner', desc: 'Practice accurate throwing and kicking to initiate attacks and clear danger.',
+                    videos: [
+                        {
+                            title: 'Goalkeeper Throwing Distribution',
+                            url: 'https://www.youtube.com/watch?v=p4v34iX_93w'
+                        },
+                        {
+                            title: 'Goalie Kicking for Beginners',
+                            url: 'https://www.youtube.com/watch?v=o04i62F-sXk'
+                        }
+                    ]
+                },
+            ],
+        };
+
+        // Gameplay Tips Videos organized by position
+        const gameplayTipsVideos = {
+            striker: [
+                { title: 'How to improve your movement and finishing as a striker', url: 'https://www.youtube.com/shorts/ZcNigOZN0Fo' },
+                { title: 'Score more goals by doing THIS', url: 'https://www.youtube.com/watch?v=BPd1teSaHok' },
+                { title: 'Striker 4 basic movements', url: 'https://www.youtube.com/watch?v=n82IBXn6NFM' },
+                { title: 'Improve off-the-ball movement and SCORE 10x more!', url: 'https://www.youtube.com/watch?v=OYBEvyy4ZdY' },
+                { title: 'How To Press Like Luis Suarez', url: 'https://www.youtube.com/watch?v=xfWNrXaQPFA' },
+                { title: '3 simple FIRST TOUCH drills that will help you TURN with the ball', url: 'https://www.youtube.com/watch?v=PGKwuV80muI' },
+                { title: 'Striker Goal Scoring Runs that Actually Work!', url: 'https://www.youtube.com/watch?v=j895sjqIvqU' }
+            ],
+            midfielder: [
+                { title: 'How To Boost Your Scanning Skills To Become The ULTIMATE PLAYMAKER', url: 'https://www.youtube.com/watch?v=vf0AkYAL6Ig&t=70s' },
+                { title: 'Improve vision & awareness with Ødegaard as your teacher', url: 'https://www.youtube.com/watch?v=rhSxSFtyw0A' },
+                { title: 'How to Play Midfield like KEVIN DE BRUYNE', url: 'https://www.youtube.com/watch?v=DEDjdRFTBys' },
+                { title: 'Break defenses with these 3 through ball techniques', url: 'https://www.youtube.com/watch?v=TC8h0dY1M7A' },
+                { title: 'How to play as a Center Midfielder - Movement and Positioning', url: 'https://www.youtube.com/watch?v=rsMJJCnJ3Rc' },
+                { title: 'Midfielder Specific Drills - Individual Midfielder Training', url: 'https://www.youtube.com/watch?v=BVSbHtBRSTU' }
+            ],
+            defender: [
+                { title: 'The Art of Defending', url: 'https://www.youtube.com/watch?v=lwsYLb0wSpc' },
+                { title: 'How To Defend 1v1 In Football', url: 'https://www.youtube.com/watch?v=F_Yc80v8Vz8' }
+            ],
+            goalkeeper: [
+                { title: 'Goalkeeper Communication Drills', url: 'https://www.youtube.com/watch?v=2r7d1t2rY78' },
+                { title: 'Goalkeeper Distribution Drills', url: 'https://www.youtube.com/watch?v=qT_R0b_240k' }
+            ]
+        };
+
+        // Gameplay Tips Content (Markdown format for dynamic rendering)
+        const gameplayTipsContent = {
+            striker: {
+                focus: `
+* **Movement Off-Ball:** Make intelligent runs (e.g., diagonal, in-behind, check-ins) to create space and passing options for teammates.
+* **Clinical Finishing:** Prioritize shot placement and quick release over raw power. Aim for corners and practice with both feet.
+* **First Touch:** Control the ball instantly and cleanly upon reception, setting up your next action or shot efficiently.
+* **Rebounds & Follow-ups:** Always anticipate saved shots or loose balls in the box; be quick to react and pounce on scoring opportunities.
+* **Hold-Up Play:** Use your body to shield the ball effectively, linking up with midfielders and bringing other players into the attack.
+* **Pressing:** Initiate defensive pressure from the front line, forcing opponents into errors in their own half.
+`
+            },
+            midfielder: {
+                focus: `
+* **Vision & Scanning:** Constantly scan the field (check shoulders) before receiving the ball to identify space, teammates, and opponents for faster decision-making.
+* **Progressive Passing:** Always look for opportunities to pass forward and break opponent lines, moving the ball from defense to attack efficiently.
+* **Tempo Control:** Dictate the pace of the game; know when to speed up play with quick passes and when to slow down to maintain possession and reorganize.
+* **Support & Angles:** Provide passing options for teammates by intelligently moving into open spaces and creating optimal passing angles.
+* **Defensive Transition:** Quickly drop back and help defend when possession is lost, covering space and marking opponents to prevent counter-attacks.
+* **Set-Piece Delivery:** If responsible, practice accurate free kicks and corner kicks to create scoring chances.
+* **Work Rate:** Demonstrate a high work rate both defensively and offensively, covering ground to link defense and attack effectively.
+`
+            },
+            defender: {
+                focus: `
+* **Smart Positioning:** Maintain proper defensive shape relative to the ball, opponent, and goal. Always stay goalside and avoid being caught flat.
+* **1v1 Defending:** Approach attackers aggressively but control your speed, jockeying effectively to force them wide or into predictable areas.
+* **Tackling:** Execute clean, well-timed tackles to win possession without committing fouls or risking injury.
+* **Communication:** Be vocal and clear! Organize the backline, call out "man on," indicate when to press or drop, and direct teammates' movements.
+* **Cover & Balance:** Understand when to pressure the ball (first defender) and when to provide cover for a teammate who is pressing (second defender).
+* **Anticipation & Interception:** Read the game by anticipating opponent passes and cutting off attacking runs to win possession.
+* **Clearing Lines:** When under pressure in your defensive third or penalty box, prioritize clearing the ball safely and effectively.
+`
+            },
+            goalkeeper: {
+                focus: `
+* **Shot-Stopping:** Master basic catching techniques. Practice diving saves for shots to corners, always aiming for a clean catch or safe parry.
+* **Command Your Area:** Be assertive on crosses and high balls. Communicate loudly, and confidently come out to claim or punch the ball in your penalty area.
+* **Distribution:** Initiate attacks with accurate throws or kicks. Identify open teammates quickly to launch counter-attacks or relieve pressure.
+* **Angle Play:** Constantly adjust your position in goal based on ball movement to reduce the opponent's shooting angles.
+* **Constant Communication:** You see the entire field. Be the eyes and ears of the defense, alerting teammates to dangers and giving clear instructions.
+* **Sweeper Keeper:** Be ready to rush off your line to clear through balls or challenge attackers outside the box when necessary.
+`
+            }
+        };
+
+
+        // --- Core UI Element References ---
+        const htmlElement = document.documentElement;
+        const navButtons = document.querySelectorAll('.nav-btn');
+        const contentSections = document.querySelectorAll('.content-section');
+        const macroCtx = document.getElementById('macroChart');
+        const drillsGrid = document.getElementById('drills-grid');
+        const filterContainer = document.getElementById('filter-container');
+        const generateMealBtn = document.getElementById('generateMealBtn');
+        const mealOutput = document.getElementById('mealOutput');
+        const emphasizeFoodsList = document.getElementById('emphasize-foods');
+        const suggestDrillBtn = document.getElementById('suggestDrillBtn');
+        const drillOutput = document.getElementById('drillOutput');
+        const inputModal = document.getElementById('inputModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalLabel1 = document.getElementById('modalLabel1');
+        const modalInput1 = document.getElementById('modalInput1');
+        const modalLabel2 = document.getElementById('modalLabel2');
+        const modalInput2 = document.getElementById('modalInput2');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        const modalCancelBtn = document.getElementById('modalCancelBtn');
+
+        let currentModalResolve;
+        let currentModalReject;
+
+
+        // --- Utility Functions ---
+
+        // Handles dark/bright mode toggle functionality
+        function initializeThemeToggle() {
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            const savedTheme = localStorage.getItem('theme');
+
+            if (savedTheme === 'dark') {
+                htmlElement.classList.add('dark');
+                darkModeToggle.checked = true;
+            } else {
+                htmlElement.classList.remove('dark');
+                darkModeToggle.checked = false;
+            }
+
+            darkModeToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    htmlElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    htmlElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        }
+
+        // Manages navigation between different content sections
+        function initializeNavigation() {
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.target;
+
+                    navButtons.forEach(btn => {
+                        btn.classList.remove('nav-active');
+                        btn.classList.add('nav-inactive');
+                        // Ensure all tabs always have the base .nav-tab styling for dimensions
+                        // The .nav-tab class is ALREADY present from initial HTML, no need to add/remove here
+                        btn.style.zIndex = '1'; // Reset z-index
+                    });
+
+                    button.classList.add('nav-active');
+                    button.classList.remove('nav-inactive');
+                    // Keep nav-tab on the active button; only apply active state styling
+                    // The CSS for .nav-active now handles border-bottom-color
+                    button.style.zIndex = '10'; // Bring active tab to front
+
+                    contentSections.forEach(section => {
+                        if (section.id === targetId) {
+                            section.classList.add('active');
+                        } else {
+                            section.classList.remove('active');
+                        }
+                    });
+                    window.scrollTo(0, 0); // Scroll to top on page change
+                });
+            });
+        }
+
+        // Sets up the Chart.js doughnut chart for macronutrients
+        function initializeMacroChart() {
+            if (macroCtx) {
+                const chartInstance = new Chart(macroCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Carbohydrates', 'Protein', 'Healthy Fats'],
+                        datasets: [{
+                            label: '% of Daily Calories',
+                            data: [58, 20, 22],
+                            backgroundColor: [
+                                'rgba(59, 130, 246, 0.8)',  /* blue-500 */
+                                'rgba(34, 197, 94, 0.8)',  /* green-500 */
+                                'rgba(245, 158, 11, 0.8)'   /* amber-500 */
+                            ],
+                            borderColor: [
+                                'rgba(59, 130, 246, 1)',
+                                'rgba(34, 197, 94, 1)',
+                                'rgba(245, 158, 11, 1)'
+                            ],
+                            borderWidth: 1,
+                            hoverOffset: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: {
+                                        size: 14,
+                                        family: "'Inter', sans-serif"
+                                    },
+                                    color: 'rgb(107 114 128)' // Default text-gray-500
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed !== null) {
+                                            label += context.parsed + '%';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Update Chart.js legend color on theme change (manual update needed for Chart.js)
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName === 'class') {
+                            if (htmlElement.classList.contains('dark')) {
+                                chartInstance.options.plugins.legend.labels.color = 'rgb(212 212 216)'; /* zinc-300 */
+                            } else {
+                                chartInstance.options.plugins.legend.labels.color = 'rgb(107 114 128)'; /* gray-500 */
+                            }
+                            chartInstance.update();
+                        }
+                    });
+                });
+                observer.observe(htmlElement, { attributes: true });
+            }
+        }
+
+        // Renders the drill cards based on the selected filter
+        function renderDrills(filter = 'all') {
+            drillsGrid.innerHTML = '';
+            let drillsToRender = [];
+
+            if (filter === 'all') {
+                for (const category in drillsByCategory) {
+                    drillsToRender = drillsToRender.concat(drillsByCategory[category]);
+                }
+            } else {
+                drillsToRender = drillsByCategory[filter] || [];
+            }
+
+            if (drillsToRender.length === 0) {
+                drillsGrid.innerHTML = `<p class="text-gray-500 md:col-span-2 lg:col-span-3 text-center transition-colors duration-300">No drills found for this category.</p>`;
+                return;
+            }
+
+            drillsToRender.forEach(drill => {
+                let videoLinksHtml = '';
+                if (drill.videos && drill.videos.length > 0) {
+                    // Limit to max 10 videos
+                    const videosToShow = drill.videos.slice(0, 10);
+                    videoLinksHtml = videosToShow.map(video =>
+                        `<div class="flex flex-col items-start">
+                            <a href="${video.url}" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors duration-300">${video.title}</a>
+                        </div>`
+                    ).join('');
+                } else {
+                    videoLinksHtml = `<span class="text-sm text-gray-400 transition-colors duration-300">No Video Available</span>`;
+                }
+
+                const card = `
+                    <div class="drill-card bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex flex-col justify-between transition-colors duration-300 dark:bg-gray-800 dark:border-gray-700">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="text-lg font-bold text-gray-800 transition-colors duration-300 dark:text-gray-50">${drill.name}</h4>
+                                <span class="text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded-full ${drill.category === 'stamina' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' : drill.category === 'strength' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' : drill.category === 'flexibility' ? 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100' : drill.category === 'passing' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : drill.category === 'dribbling' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' : drill.category === 'shooting' ? 'bg-orange-100 text-orange-800 dark:bg-orange-800 dark:text-orange-100' : drill.category === 'defending' ? 'bg-pink-100 text-pink-800 dark:bg-pink-800 dark:text-pink-100' : drill.category === 'receiving' ? 'bg-teal-100 text-teal-800 dark:bg-teal-800 dark:text-teal-100' : drill.category === 'communication' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'} transition-colors duration-300">${drill.category}</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-4 transition-colors duration-300 dark:text-gray-300">${drill.desc}</p>
+
+                            <div class="mt-4 text-xs text-gray-500 transition-colors duration-300 dark:text-gray-400">
+                                <p>Imp: <strong class="text-gray-700 transition-colors duration-300 dark:text-gray-200">${drill.importance}</strong></p>
+                                <p>Diff: <strong class="text-gray-700 transition-colors duration-300 dark:text-gray-200">${drill.difficulty}</strong></p>
+                            </div>
+
+                            <div class="mt-4">
+                                <p class="font-semibold text-gray-700 dark:text-gray-200 mb-2">Videos:</p>
+                                <div class="flex flex-col space-y-1">
+                                    ${videoLinksHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                drillsGrid.innerHTML += card;
+            });
+        }
+
+        // Initializes the training drills section with filters
+        function initializeDrillsSection() {
+            renderDrills(); // Initial render
+
+            filterContainer.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    const filter = e.target.dataset.filter;
+                    renderDrills(filter);
+
+                    // Update active button style
+                    filterContainer.querySelectorAll('button').forEach(btn => {
+                        btn.classList.remove('filter-btn-active');
+                        btn.classList.add('filter-btn-inactive');
+                    });
+                    e.target.classList.add('filter-btn-active');
+                    e.target.classList.remove('filter-btn-inactive');
+                }
+            });
+        }
+
+        // Manages the custom modal for user input
+        function initializeModal() {
+            inputModal.style.display = 'none'; // Ensure hidden on load
+
+            modalConfirmBtn.onclick = () => {
+                inputModal.style.display = 'none';
+                currentModalResolve({ input1: modalInput1.value, input2: modalInput2.value });
+            };
+
+            modalCancelBtn.onclick = () => {
+                inputModal.style.display = 'none';
+                currentModalReject(new Error("User cancelled input."));
+            };
+
+            inputModal.addEventListener('click', (e) => {
+                if (e.target === inputModal) { // Clicked outside the modal content
+                    inputModal.style.display = 'none';
+                    currentModalReject(new Error("User cancelled input."));
+                }
+            });
+        }
+
+        // Displays the custom modal and returns a Promise with input values
+        function showModal(title, label1, placeholder1, label2 = null, placeholder2 = null) {
+            return new Promise((resolve, reject) => {
+                modalTitle.innerText = title;
+                modalLabel1.innerText = label1;
+                modalInput1.value = '';
+                modalInput1.placeholder = placeholder1;
+                modalInput1.focus();
+
+                if (label2 && placeholder2) {
+                    modalLabel2.innerText = label2;
+                    modalInput2.value = '';
+                    modalInput2.placeholder = placeholder2;
+                    modalLabel2.style.display = 'block';
+                    modalInput2.style.display = 'block';
+                } else {
+                    modalLabel2.style.display = 'none';
+                    modalInput2.style.display = 'none';
+                }
+
+                inputModal.style.display = 'flex';
+                currentModalResolve = resolve;
+                currentModalReject = reject;
+            });
+        }
+
+        // Converts simple Markdown (bold, lists, links) to HTML
+        function convertMarkdownToHtml(markdownText) {
+            let html = markdownText;
+
+            // Convert markdown links [text](url) to HTML <a> tags, removing raw link display
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>');
+
+            // Convert bold (**)
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            // Split by lines to handle list items and paragraphs
+            const lines = html.split('\n');
+            let resultHtml = [];
+            let inList = false;
+
+            lines.forEach(line => {
+                // Regex to capture potential emoji + optional bullet + content
+                const listItemMatch = line.trim().match(/^(\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji})?\s*\*?\s*(.*)/u);
+
+                if (listItemMatch && listItemMatch[2].length > 0) {
+                    if (!inList) {
+                        resultHtml.push('<ul>');
+                        inList = true;
+                    }
+                    const content = listItemMatch[2];
+                    resultHtml.push(`<li>${content}</li>`);
+                } else {
+                    if (inList) {
+                        resultHtml.push('</ul>');
+                        inList = false;
+                    }
+                    if (line.trim().length > 0) {
+                        resultHtml.push(`<p>${line.trim()}</p>`);
+                    }
+                }
+            });
+
+            if (inList) {
+                resultHtml.push('</ul>');
+            }
+            return resultHtml.join('');
+        }
+
+        // Handles fetching from Gemini API with exponential backoff
+        async function fetchWithRetry(url, payload, outputElement) {
+            let retries = 0;
+            const maxRetries = 5;
+            let delay = 1000;
+
+            while (retries < maxRetries) {
+                try {
+                    const apiKey = ""; // Canvas will provide this at runtime
+                    const response = await fetch(`${url}?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        return text;
+                    } else {
+                        throw new Error("Invalid response structure from API.");
+                    }
+                } catch (error) {
+                    retries++;
+                    if (retries < maxRetries) {
+                        await new Promise(res => setTimeout(res, delay));
+                        delay *= 2;
+                    } else {
+                        throw new Error(`Max retries exceeded: ${error.message}`);
+                    }
+                }
+            }
+        }
+
+        // --- Gameplay Tips Section Initialization ---
+        function initializeGameplayTips() {
+            // Render the markdown content for each position's focus area
+            document.getElementById('striker-focus').innerHTML = convertMarkdownToHtml(gameplayTipsContent.striker.focus);
+            document.getElementById('midfielder-focus').innerHTML = convertMarkdownToHtml(gameplayTipsContent.midfielder.focus);
+            document.getElementById('defender-focus').innerHTML = convertMarkdownToHtml(gameplayTipsContent.defender.focus);
+            document.getElementById('goalkeeper-focus').innerHTML = convertMarkdownToHtml(gameplayTipsContent.goalkeeper.focus);
+
+            // Render video lists for each position
+            function renderGameplayVideos(position, elementId) {
+                const videoListElement = document.getElementById(elementId);
+                if (!videoListElement) return;
+
+                videoListElement.innerHTML = ''; // Clear existing content
+
+                const videos = gameplayTipsVideos[position] || [];
+                if (videos.length === 0) {
+                    videoListElement.innerHTML = `<li class="text-sm text-gray-400 dark:text-gray-500">No videos available for this position.</li>`;
+                    return;
+                }
+                
+                // Limit to max 10 videos
+                const videosToShow = videos.slice(0, 10);
+
+                videosToShow.forEach(video => {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<a href="${video.url}" target="_blank" rel="noopener noreferrer" class="text-sm font-medium ${position === 'striker' ? 'text-blue-600 hover:text-blue-800' : position === 'midfielder' ? 'text-emerald-600 hover:text-emerald-800' : position === 'defender' ? 'text-purple-600 hover:text-purple-800' : 'text-orange-600 hover:text-orange-800'} transition-colors duration-300">${video.title}</a>`;
+                    videoListElement.appendChild(listItem);
+                });
+            }
+
+            renderGameplayVideos('striker', 'striker-videos');
+            renderGameplayVideos('midfielder', 'midfielder-videos');
+            renderGameplayVideos('defender', 'defender-videos');
+            renderGameplayVideos('goalkeeper', 'goalkeeper-videos');
+        }
+
+
+        // --- Gemini Feature Setup ---
+
+        function setupGeminiFeatures() {
+            generateMealBtn.addEventListener('click', async () => {
+                mealOutput.innerHTML = `<div class="flex items-center justify-center text-gray-600 dark:text-gray-300">
+                                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Generating meal idea...
+                                        </div>`;
+                try {
+                    const inputs = await showModal(
+                        "Generate a Meal Idea",
+                        "Meal Type (e.g., Breakfast, Lunch, Dinner, Snack):", "e.g., Dinner",
+                        "Dietary Focus (optional, e.g., High-Carb, Vegetarian):", "e.g., Quick, Vegetarian"
+                    );
+
+                    const mealType = inputs.input1;
+                    const dietaryFocus = inputs.input2;
+
+                    if (!mealType) {
+                        mealOutput.innerHTML = "<p class='text-red-600 dark:text-red-300'>Meal type is required to generate a meal idea.</p>";
+                        return;
+                    }
+
+                    const promptText = `Generate a ${mealType} meal idea for a football player, focusing on ${dietaryFocus || 'general nutrition'} using foods from this list: ${emphasizeFoodsList.innerText}. Provide the meal in a concise list format. Each item should be a single bullet point ('* ') followed by the food components and a very brief description. Start each item with a food emoji like 🍎 or 🍝.`;
+
+                    const payload = { contents: [{ role: "user", parts: [{ text: promptText }] }] };
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent`;
+
+                    const text = await fetchWithRetry(apiUrl, payload, mealOutput);
+                    mealOutput.innerHTML = `<div class="p-4 rounded-lg bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-100"><h4 class="font-bold mb-2">Suggested Meal:</h4>${convertMarkdownToHtml(text)}</div>`;
+
+                } catch (error) {
+                    if (error.message !== "User cancelled input.") {
+                        mealOutput.innerHTML = `<p class='text-red-600 dark:text-red-300'>Error generating meal idea: ${error.message}</p>`;
+                    } else {
+                        mealOutput.innerHTML = "<p class='text-gray-600 dark:text-gray-300'>Meal idea generation cancelled.</p>";
+                    }
+                }
+            });
+
+            suggestDrillBtn.addEventListener('click', async () => {
+                drillOutput.innerHTML = `<div class="flex items-center justify-center text-gray-600 dark:text-gray-300">
+                                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Generating drill suggestion...
+                                        </div>`;
+                try {
+                    const inputs = await showModal(
+                        "Suggest a Custom Drill",
+                        "Skill Focus (e.g., Passing Accuracy, Dribbling):", "e.g., Defensive Positioning",
+                        "Context (optional, e.g., For beginners, Under pressure):", "e.g., In a small space, with 3 players"
+                    );
+
+                    const skillFocus = inputs.input1;
+                    const context = inputs.input2;
+
+                    if (!skillFocus) {
+                        drillOutput.innerHTML = "<p class='text-red-600 dark:text-red-300'>Skill focus is required to suggest a drill.</p>";
+                        return;
+                    }
+
+                    const promptText = `Suggest a football drill to improve ${skillFocus} ${context ? `for ${context}` : ''}. Provide the drill in a concise, bulleted format. Each point should start with a relevant emoji and be a single bullet point ('* '). Include: 1. Drill Name, 2. Objective, 3. Description (max 3 sentences), 4. Equipment Needed. Also, include 1-2 suitable YouTube video links with titles at the end, formatted as: [Video Title](YouTube URL). Ensure these links are to publicly available videos.`;
+
+                    const payload = { contents: [{ role: "user", parts: [{ text: promptText }] }] };
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent`;
+
+                    const text = await fetchWithRetry(apiUrl, payload, drillOutput);
+                    drillOutput.innerHTML = `<div class="p-4 rounded-lg bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-100"><h4 class="font-bold mb-2">Suggested Drill:</h4>${convertMarkdownToHtml(text)}</div>`;
+
+                } catch (error) {
+                    if (error.message !== "User cancelled input.") {
+                        drillOutput.innerHTML = `<p class='text-red-600 dark:text-red-300'>Error generating drill suggestion: ${error.message}</p>`;
+                    } else {
+                        drillOutput.innerHTML = "<p class='text-gray-600 dark:text-gray-300'>Drill suggestion cancelled.</p>";
+                    }
+                }
+            });
+        }
+
+
+        // --- Initialize the Application ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeThemeToggle();
+            initializeNavigation();
+            initializeMacroChart();
+            initializeDrillsSection(); // Render drills from hardcoded data
+            initializeModal();
+            initializeGameplayTips(); // Initialize gameplay tips after data is ready
+            setupGeminiFeatures(); // Setup AI features after modal is initialized
+        });
+    </script>
+</body>
+</html>

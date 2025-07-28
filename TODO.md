@@ -6,7 +6,7 @@ This document outlines potential improvements and tasks for the NFT Weingarten F
 
 - [ ] **Modularity and Separation of Concerns (JavaScript)**: Split the monolithic JavaScript block into separate, logically grouped files (e.g., `theme.js`, `navigation.js`, `charts.js`, `drills.js`, `gameplayTips.js`, `modals.js`, `gemini.js`).
 - [ ] **HTML Semantics and Accessibility**: Review and enhance HTML with more semantic tags (e.g., `<article>`, `<aside>`) and ARIA attributes for improved accessibility. Ensure consistent heading hierarchy.
-- [x] **CSS Organization and Maintainability**: Move custom CSS from the `<style>` block into a separate `.css` file (e.g., `style.css` or `custom.css`). Consider consolidating rules or leveraging more Tailwind utilities.
+- [ ] **CSS Organization and Maintainability**: Move custom CSS from the `<style>` block into a separate `.css` file (e.g., `style.css` or `custom.css`). Consider consolidating rules or leveraging more Tailwind utilities.
 - [ ] **JavaScript Best Practices**:
     - [ ] Implement more robust error handling with specific user feedback for API calls and other operations.
     - [ ] Investigate and implement performance optimizations like lazy loading for images or non-critical sections.

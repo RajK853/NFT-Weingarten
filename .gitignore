@@ -18,8 +18,6 @@ build/
 # Logs
 *.log
 
-# Docs
-docs/
-
 # Internal documentation
 docs/internal/
+docs/internal/**
